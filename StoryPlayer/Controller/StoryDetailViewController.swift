@@ -220,7 +220,6 @@ extension StoryDetailViewController: SegmentedProgressBarDelegate {
     
     func goNext() {
         
-//        self.tap.isEnabled = false
         if currentPlayer != nil {
             self.currentPlayer?.pause()
             self.currentPlayerLayer?.removeFromSuperlayer()
@@ -238,10 +237,8 @@ extension StoryDetailViewController: SegmentedProgressBarDelegate {
             // Means that changing to next media
             self.spb.skip()
             if currentStories[self.currentStoryIndex].isVideo == 1 {
-                print("next video")
                 self.adjustVideo()
             } else {
-                print("next image")
                 self.adjustImage()
             }
             
@@ -250,6 +247,11 @@ extension StoryDetailViewController: SegmentedProgressBarDelegate {
     }
     
     func goPrevious() {
+        
+        if currentPlayer != nil {
+            self.currentPlayer?.pause()
+            self.currentPlayerLayer?.removeFromSuperlayer()
+        }
         
         currentStoryIndex -= 1
         
@@ -261,9 +263,14 @@ extension StoryDetailViewController: SegmentedProgressBarDelegate {
             
         } else {
             // Means that changing to next media
-            print("previous image")
-            self.adjustImage()
             self.spb.rewind()
+            if currentStories[self.currentStoryIndex].isVideo == 1 {
+                self.adjustVideo()
+            } else {
+                self.adjustImage()
+                
+            }
+            
             
         }
         
@@ -298,47 +305,30 @@ extension StoryDetailViewController: SegmentedProgressBarDelegate {
         videoView.playerLayer = AVPlayerLayer(player: videoView.player)
         videoView.playerLayer!.frame = self.view.bounds
         videoView.layer.addSublayer(videoView.playerLayer!)
+        videoView.player?.play()
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            self.spb.isPaused = false
+        }
         
         self.currentPlayer = videoView.player
         self.currentPlayerLayer = videoView.playerLayer
         
-        videoView.player!.addObserver(self, forKeyPath: "reasonForWaitingToPlay", options: .new, context: .none)
+        
+        currentPlayer!.addObserver(self, forKeyPath: "rate", options: .new, context: .none)
         
     }
     
     override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
-        guard context == .none else {
-            super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
-            return
-        }
-
-        // look at `change![.newKey]` to see what the status is, e.g.
-
-        if keyPath == "reasonForWaitingToPlay" {
-            NSLog("\(keyPath): \(change![.newKey])")
-            
-            if change![.newKey] as? AVPlayer.WaitingReason == .toMinimizeStalls || change![.newKey] as? AVPlayer.WaitingReason == .noItemToPlay || change![.newKey] as? AVPlayer.WaitingReason == .evaluatingBufferingRate {
-                
-                print("notReady")
-                
-            } else {
-                
-                if change![.newKey] as? AVPlayer.WaitingReason == nil {
-                    
-                    if !self.isVideoPlaying {
-                        self.currentPlayer?.play()
-                        self.isVideoPlaying = true
-                        self.spb.isPaused = false
-                    }
-                    
-                    print("ready")
-                    print("seconds = \(self.currentPlayer?.currentItem?.asset.duration.seconds)")
-                    
-                    
-                }
+        
+        if keyPath == "rate" {
+            print("rate")
+            let videoView = allStoriesViewArray[self.currentIndex].subviews[1] as! VideoView
+            if videoView.player!.rate > 0 {
+                print("video started")
             }
-            
         }
+        
     }
     
     @objc func playerItemDidReachEnd() {
@@ -349,6 +339,8 @@ extension StoryDetailViewController: SegmentedProgressBarDelegate {
     }
     
     func changeIndex(isNext: Bool, withIndex: Int?) {
+        
+        self.currentStoryIndex = 0
         
         if let index = withIndex {
             self.currentIndex = index
